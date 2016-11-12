@@ -17,36 +17,58 @@ public final class MyStrategy implements Strategy {
     private World world;
     private Game game;
     private Move move;
-
+    //  константа для дистанции , если она не определена
+    private final double wrongDistance = -1;
+    //последнее изменение позиции 
+    private static double changingPosition = 0;
+    // предыдущая позиция
+    private static Point2D prevPos = new Point2D(0,0);
+    
     @Override
     public void move(Wizard self, World world, Game game, Move move) {
+    	
         initializeStrategy(self, game);
         initializeTick(self, world, game, move);
-
+        
  
         move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
-
-        
-        if (self.getLife() < self.getMaxLife() * LOW_HP_FACTOR) {
+        // определяем дистанцию до ближайшей цели
+        LivingUnit nearestTarget = getNearestTarget();
+        double distance = wrongDistance;
+        if (nearestTarget != null) {
+            distance = self.getDistanceTo(nearestTarget);
+         // отходим при малых хп
+        if ((self.getLife() < self.getMaxLife() * LOW_HP_FACTOR) && (distance < 600)) {
             goTo(getPreviousWaypoint());
             return;
         }
-
-        LivingUnit nearestTarget = getNearestTarget();
-
-        if (nearestTarget != null) {
-            double distance = self.getDistanceTo(nearestTarget);
-
-            // ... è îí â ïðåäåëàõ äîñÿãàåìîñòè íàøèõ çàêëèíàíèé, ...
+        //отходим , если противник ближе 300 (500 - дальность стрельбы)
+        if ((distance != wrongDistance)&&(distance <= 300)) {
+            goTo(getPreviousWaypoint());
+            return;
+        }
+        //выходим из тупика 
+        Point2D curPos = new Point2D(self.getX(),self.getY());
+        if (prevPos == curPos){
+        	changingPosition++;
+        	if (changingPosition == 5) {
+                goTo(getPreviousWaypoint());
+                return;
+            }
+        }
+        else {
+        	changingPosition = 0;
+        	prevPos = curPos;
+        }
+        
+            
             if (distance <= self.getCastRange()) {
-                double angle = self.getAngleTo(nearestTarget);
-
-                // ... òî ïîâîðà÷èâàåìñÿ ê öåëè.
+              // узнаём угол до врага 
+            	double angle = self.getAngleTo(nearestTarget);
+            	// поворачиваемся 
                 move.setTurn(angle);
-
-                // Åñëè öåëü ïåðåä íàìè, ...
+                
                 if (StrictMath.abs(angle) < game.getStaffSector() / 2.0D) {
-                    // ... òî àòàêóåì.
                     move.setAction(ActionType.MAGIC_MISSILE);
                     move.setCastAngle(angle);
                     move.setMinCastDistance(distance - nearestTarget.getRadius() + game.getMagicMissileRadius());
