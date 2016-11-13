@@ -56,7 +56,7 @@ Temporary Items
 *.pydevproject
 .project
 .metadata
-java-cgdk/bin/**
+bin/**
 tmp/**
 tmp/**/*
 *.tmp
@@ -73,6 +73,7 @@ local.properties
 
 # Locally stored "Eclipse launch configurations"
 *.launch
-.metadata/.mylyn/.tasks.xml.zip
 *.zip
+*.snap
+.metadata/.plugins/org.eclipse.core.resources/.safetable/org.eclipse.core.resources
 *.xmi

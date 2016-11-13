@@ -5,7 +5,7 @@ import java.util.*;
 public final class MyStrategy implements Strategy {
 	private static final double WAYPOINT_RADIUS = 100.0D;
 
-	private static final double LOW_HP_FACTOR = 0.5D;
+	private static double LOW_HP_FACTOR = 0.5D;
 	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
 
 	private Random random;
@@ -23,12 +23,25 @@ public final class MyStrategy implements Strategy {
 	private static double changingPosition = 0;
 	// предыдущая позиция
 	private static Point2D prevPos = new Point2D(0, 0);
-
+	private static double prevLife;
+	private static double damagedLife;
+	
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
-
+		if (game.getTickCount() == 1){
+			damagedLife = prevLife = self.getMaxLife();
+		}
 		initializeStrategy(self, game);
 		initializeTick(self, world, game, move);
+		if (prevLife > self.getLife()){
+			damagedLife = prevLife;
+			LOW_HP_FACTOR = 0.5D;
+		}else{
+			if (prevLife > damagedLife)
+				LOW_HP_FACTOR = 0.25D;
+				damagedLife = prevLife; 
+		}
+		prevLife = self.getLife();
 		// определяем дистанцию до ближайшей цели
 		LivingUnit nearestTarget = getNearestTarget();
 		double distance = wrongDistance;
