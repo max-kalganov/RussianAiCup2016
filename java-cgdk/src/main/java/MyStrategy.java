@@ -5,7 +5,7 @@ import java.util.*;
 public final class MyStrategy implements Strategy {
 	private static final double WAYPOINT_RADIUS = 100.0D;
 
-	private static final double LOW_HP_FACTOR = 0.25D;
+	private static final double LOW_HP_FACTOR = 0.5D;
 	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
 
 	private Random random;
@@ -29,8 +29,6 @@ public final class MyStrategy implements Strategy {
 
 		initializeStrategy(self, game);
 		initializeTick(self, world, game, move);
-		// из-за этого он дёргается
-		move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
 		// определяем дистанцию до ближайшей цели
 		LivingUnit nearestTarget = getNearestTarget();
 		double distance = wrongDistance;
@@ -61,6 +59,9 @@ public final class MyStrategy implements Strategy {
 				changingPosition = 0;
 				prevPos = curPos;
 			}
+			// из-за этого он дёргается
+			move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
+						
 			if(setAttack(distance,nearestTarget))
 				return;
 			
@@ -203,9 +204,6 @@ public final class MyStrategy implements Strategy {
 				move.setSpeed(0);
 
 			}
-			if (self.getLife()<self.getMaxLife()*0.10){	
-				int a = 9;
-			}
 			
 			double speedR = Math.abs(game.getWizardStrafeSpeed());
 			double speedB = -1*Math.abs(game.getWizardBackwardSpeed());
@@ -229,7 +227,7 @@ public final class MyStrategy implements Strategy {
 				move.setSpeed(speed);
 			
 			}
-		
+			
 		}
 
 	}
