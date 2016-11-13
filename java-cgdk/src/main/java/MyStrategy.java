@@ -37,9 +37,9 @@ public final class MyStrategy implements Strategy {
 			damagedLife = prevLife;
 			LOW_HP_FACTOR = 0.5D;
 		}else{
-			if (prevLife > damagedLife)
+			if (prevLife >= damagedLife){
 				LOW_HP_FACTOR = 0.25D;
-				damagedLife = prevLife; 
+				damagedLife = prevLife; }
 		}
 		prevLife = self.getLife();
 		// определяем дистанцию до ближайшей цели
@@ -73,7 +73,8 @@ public final class MyStrategy implements Strategy {
 				prevPos = curPos;
 			}
 			// из-за этого он дёргается
-			move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
+			if (distance <= 600)
+				move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
 						
 			if(setAttack(distance,nearestTarget))
 				return;
