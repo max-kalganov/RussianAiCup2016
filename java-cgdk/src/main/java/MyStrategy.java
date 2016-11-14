@@ -56,7 +56,7 @@ public final class MyStrategy implements Strategy {
 			// отходим , если противник ближе 300 (500 - дальность стрельбы)
 			if ((distance != wrongDistance) && (distance <= 300)) {
 				goTo(getPreviousWaypoint(),true);
-				setAttack(distance,nearestTarget);
+				setAttack(self.getDistanceTo(getNearestTargetWithLowestHP()),getNearestTargetWithLowestHP());
 				return;
 			}
 			// выходим из тупика
@@ -75,9 +75,12 @@ public final class MyStrategy implements Strategy {
 			// из-за этого он дёргается
 			if (distance <= 600)
 				move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
-						
-			if(setAttack(distance,nearestTarget))
-				return;
+			if (getNearestTargetWithLowestHP() != null){			
+				if(setAttack(self.getDistanceTo(getNearestTargetWithLowestHP()),getNearestTargetWithLowestHP()))
+					return;
+			}else 
+				if(setAttack(distance,nearestTarget))
+					return;
 			
 		}
 
@@ -270,6 +273,35 @@ public final class MyStrategy implements Strategy {
 
 		return nearestTarget;
 	}
+	
+	private LivingUnit getNearestTargetWithLowestHP() {
+		List<LivingUnit> targets = new ArrayList<>();
+		targets.addAll(Arrays.asList(world.getBuildings()));
+		targets.addAll(Arrays.asList(world.getWizards()));
+		targets.addAll(Arrays.asList(world.getMinions()));
+
+		LivingUnit nearestTarget = null;
+		double nearestTargetHP = 100;
+		double nearestTargetDistance = 500;
+
+		for (LivingUnit target : targets) {
+			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() == self.getFaction()) {
+				continue;
+			}
+
+			double distance = self.getDistanceTo(target);
+			double HP = target.getLife()*100/target.getMaxLife();
+
+			if (distance <= nearestTargetDistance && HP<=nearestTargetHP ) {
+				nearestTarget = target;
+				nearestTargetHP = HP;
+				//nearestTargetDistance = distance;
+			}
+		}
+
+		return nearestTarget;
+	}
+
 
 	private static final class Point2D {
 		private final double x;
