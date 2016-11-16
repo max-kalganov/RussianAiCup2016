@@ -37,9 +37,10 @@ public final class MyStrategy implements Strategy {
 			damagedLife = prevLife;
 			LOW_HP_FACTOR = 0.5D;
 		}else{
-			if (prevLife >= damagedLife){
+			if (prevLife >= damagedLife && prevLife > self.getMaxLife()*0.25D){
 				LOW_HP_FACTOR = 0.25D;
-				damagedLife = prevLife; }
+				damagedLife = prevLife; 
+				}
 		}
 		prevLife = self.getLife();
 		// определяем дистанцию до ближайшей цели
@@ -274,25 +275,44 @@ public final class MyStrategy implements Strategy {
 		return nearestTarget;
 	}
 	
+	private double getPriority(LivingUnit u){
+		List<LivingUnit> targetsBuildings = new ArrayList<>();
+		List<LivingUnit> targetsWizards = new ArrayList<>();
+		List<LivingUnit> targetsMinions = new ArrayList<>();
+		
+		targetsBuildings.addAll(Arrays.asList(world.getBuildings()));
+		if (targetsBuildings.indexOf(u)!=-1)
+			return 0.25;
+		targetsWizards.addAll(Arrays.asList(world.getWizards()));
+		if (targetsWizards.indexOf(u)!=-1)
+			return 0.8;
+		targetsMinions.addAll(Arrays.asList(world.getMinions()));
+		if (targetsMinions.indexOf(u)!=-1)
+			return 1;
+		return 1;
+	}
+	
 	private LivingUnit getNearestTargetWithLowestHP() {
+		
 		List<LivingUnit> targets = new ArrayList<>();
 		targets.addAll(Arrays.asList(world.getBuildings()));
 		targets.addAll(Arrays.asList(world.getWizards()));
 		targets.addAll(Arrays.asList(world.getMinions()));
-
+		
+		
 		LivingUnit nearestTarget = null;
 		double nearestTargetHP = 100;
-		double nearestTargetDistance = 500;
+		double nearestTargetDistance = self.getCastRange();
 
 		for (LivingUnit target : targets) {
 			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() == self.getFaction()) {
 				continue;
 			}
-
+			
 			double distance = self.getDistanceTo(target);
-			double HP = target.getLife()*100/target.getMaxLife();
-
-			if (distance <= nearestTargetDistance && HP<=nearestTargetHP ) {
+			double HP = target.getLife();//*100/target.getMaxLife();
+		
+			if (distance <= nearestTargetDistance && (HP*getPriority(target))<=nearestTargetHP ) {
 				nearestTarget = target;
 				nearestTargetHP = HP;
 				//nearestTargetDistance = distance;
