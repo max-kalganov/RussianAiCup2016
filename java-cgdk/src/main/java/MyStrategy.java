@@ -26,18 +26,36 @@ public final class MyStrategy implements Strategy {
 		if(setVariables)
 			SetVariables(self,world,game,move);
 		
+		Moving();
 		
-		
+		Attack();
 			
 	}
 	
 	private void Moving(){
-		
+		LineChoice();				//Выбор линии
+		BonusSelection();			//Подбор бонусов
+		WithdrawalFromTheLine();	//Уход с линии
+		MovementDuringTheAttack();	//Движение во время атаки
+		PositionChoice();			//Выбор позиции для атаки
 	}
 	
-	private void Attacking(){
-		
+	private void Attack(){
+		TargetChoice();				//Выбор цели
+		AttacksStopCriterion();		//Критерий остановки атаки цели
+		DerogationCriteria();		//Критерий отступления
 	}
+	// Block Moving
+	private void LineChoice(){} 	
+	private void BonusSelection(){}			
+	private void WithdrawalFromTheLine(){}	
+	private void MovementDuringTheAttack(){}
+	private void PositionChoice(){}			
+	
+	// Block Attack
+	private void TargetChoice(){} 			
+	private void AttacksStopCriterion(){} 	
+	private void DerogationCriteria(){} 	
 	
 	
 	private void SetVariables(Wizard self, World world, Game game, Move move){
