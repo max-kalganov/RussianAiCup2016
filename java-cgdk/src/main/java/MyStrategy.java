@@ -3,33 +3,75 @@ import model.*;
 import java.util.*;
 
 public final class MyStrategy implements Strategy {
-	private static final double WAYPOINT_RADIUS = 100.0D;
-	private static double LOW_HP_FACTOR = 0.5D;
-	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
-
-	private Random random;
-
-	private LaneType lane;
-	private Point2D[] waypoints;
-
+	private static enum state {
+	    tank, support, cerry
+	} 
+	private static enum strategy {
+	    attack, deffence
+	}
+	
+	private static state myState;
+	private static strategy myStrategy;	
+	private static boolean setVariables = true;
+	
 	private Wizard self;
 	private World world;
 	private Game game;
 	private Move move;
-	// константа для дистанции , если она не определена
-	private final double wrongDistance = -1;
-	// последнее изменение позиции
-	private static double changingPosition = 0;
-	// предыдущая позиция
-	private static Point2D prevPos = new Point2D(0, 0);
-	private static double prevLife;
-	private static double damagedLife;
+	
 	
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
 	//	SomeFunc(self,world,game,move);
+		if(setVariables)
+			SetVariables(self,world,game,move);
+		
+		
+		
+			
+	}
+	
+	private void Moving(){
 		
 	}
+	
+	private void Attacking(){
+		
+	}
+	
+	
+	private void SetVariables(Wizard self, World world, Game game, Move move){
+		setVariables = false;
+		this.self = self;
+		this.world = world;
+		this.game = game;
+		this.move = move;
+		// пока это просто рандом в начале игры
+		int codeForState = (new Random()).nextInt()%3; 
+		switch(codeForState+1){
+		case 1:
+			myState = state.tank;
+			break;
+		case 2:
+			myState = state.support;
+			break;
+		case 3:
+			myState = state.cerry;
+			break;
+		}
+		int codeForStrategy = (new Random()).nextInt()%2; 
+		switch(codeForStrategy+1){
+		case 1:
+			myStrategy = strategy.attack;
+			break;
+		case 2:
+			myStrategy = strategy.deffence;
+			break;
+		}
+					
+		
+	}
+	
 	
 	private static final class Point2D {
 		private final double x;
@@ -66,6 +108,28 @@ public final class MyStrategy implements Strategy {
 	
 
 /*
+	private static final double WAYPOINT_RADIUS = 100.0D;
+	private static double LOW_HP_FACTOR = 0.5D;
+	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
+
+	private Random random;
+
+	private LaneType lane;
+	private Point2D[] waypoints;
+
+	// константа для дистанции , если она не определена
+	private final double wrongDistance = -1;
+	// последнее изменение позиции
+	private static double changingPosition = 0;
+	// предыдущая позиция
+	private static Point2D prevPos = new Point2D(0, 0);
+	private static double prevLife;
+	private static double damagedLife;
+
+	
+	
+	
+	
 	private void SomeFunc(Wizard self, World world, Game game, Move move){
 		if (game.getTickCount() == 1){
 			damagedLife = prevLife = self.getMaxLife();
@@ -198,12 +262,7 @@ public final class MyStrategy implements Strategy {
 		}
 	}
 
-	private void initializeTick(Wizard self, World world, Game game, Move move) {
-		this.self = self;
-		this.world = world;
-		this.game = game;
-		this.move = move;
-	}
+	
 
 	private Point2D getNextWaypoint() {
 		int lastWaypointIndex = waypoints.length - 1;
