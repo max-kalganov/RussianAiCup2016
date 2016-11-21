@@ -4,7 +4,6 @@ import java.util.*;
 
 public final class MyStrategy implements Strategy {
 	private static final double WAYPOINT_RADIUS = 100.0D;
-
 	private static double LOW_HP_FACTOR = 0.5D;
 	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
 
@@ -28,6 +27,46 @@ public final class MyStrategy implements Strategy {
 	
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
+	//	SomeFunc(self,world,game,move);
+		
+	}
+	
+	private static final class Point2D {
+		private final double x;
+		private final double y;
+
+		private Point2D(double x, double y) {
+			this.x = x;
+			this.y = y;
+		}
+
+		public double getX() {
+			return x;
+		}
+
+		public double getY() {
+			return y;
+		}
+
+		public double getDistanceTo(double x, double y) {
+			return StrictMath.hypot(this.x - x, this.y - y);
+		}
+
+		public double getDistanceTo(Point2D point) {
+			return getDistanceTo(point.x, point.y);
+		}
+
+		public double getDistanceTo(Unit unit) {
+			return getDistanceTo(unit.getX(), unit.getY());
+		}
+	}
+}
+
+	
+	
+
+/*
+	private void SomeFunc(Wizard self, World world, Game game, Move move){
 		if (game.getTickCount() == 1){
 			damagedLife = prevLife = self.getMaxLife();
 		}
@@ -88,7 +127,7 @@ public final class MyStrategy implements Strategy {
 		// Åñëè íåò äðóãèõ äåéñòâèé, ïðîñòî ïðîäâèãàåìñÿ âïåðžä.
 		goTo(getNextWaypoint(),false);
 	}
-
+	
 	private boolean setAttack(double distance,LivingUnit nearestTarget){
 
 		if (distance <= self.getCastRange()) {
@@ -323,37 +362,7 @@ public final class MyStrategy implements Strategy {
 	}
 
 
-	private static final class Point2D {
-		private final double x;
-		private final double y;
-
-		private Point2D(double x, double y) {
-			this.x = x;
-			this.y = y;
-		}
-
-		public double getX() {
-			return x;
-		}
-
-		public double getY() {
-			return y;
-		}
-
-		public double getDistanceTo(double x, double y) {
-			return StrictMath.hypot(this.x - x, this.y - y);
-		}
-
-		public double getDistanceTo(Point2D point) {
-			return getDistanceTo(point.x, point.y);
-		}
-
-		public double getDistanceTo(Unit unit) {
-			return getDistanceTo(unit.getX(), unit.getY());
-		}
-	}
-}
-
+	
 /*	if (angle < Math.PI) {
 				if (Tan > 0){
 					if (Tan > game.getWizardStrafeSpeed()/game.getWizardForwardSpeed()){
