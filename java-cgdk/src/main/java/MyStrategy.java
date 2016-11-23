@@ -13,31 +13,35 @@ public final class MyStrategy implements Strategy {
 	private static state myState;
 	private static strategy myStrategy;	
 	private static boolean setVariables = true;
+	private static Building myBase = null; 
+	private static Point2D notMyBase = null; 
+	
 	
 	private Wizard self;
 	private World world;
 	private Game game;
 	private Move move;
 	
-	
+	//private static int deathCount = 0;
+	private static boolean isNearMyBase = true;
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
-	//	SomeFunc(self,world,game,move);
+		InitTick(self,world,game,move);
 		if(setVariables)
-			SetVariables(self,world,game,move);
-		
+			SetVariables();
 		Moving();
 		
 		Attack();
-			
+		
 	}
 	
-	private void Moving(){
+	private void Moving(){	
+		WithdrawalFromTheLine();	//Уход с линии
 		LineChoice();				//Выбор линии
 		BonusSelection();			//Подбор бонусов
-		WithdrawalFromTheLine();	//Уход с линии
 		MovementDuringTheAttack();	//Движение во время атаки
 		PositionChoice();			//Выбор позиции для атаки
+		goTo(getNextWaypoint(),false);
 	}
 	
 	private void Attack(){
@@ -46,9 +50,22 @@ public final class MyStrategy implements Strategy {
 		DerogationCriteria();		//Критерий отступления
 	}
 	// Block Moving
-	private void LineChoice(){} 	
+	private void LineChoice(){
+		waypoints = waypointsByLane.get(lane);
+	} 	
 	private void BonusSelection(){}			
-	private void WithdrawalFromTheLine(){}	
+	private void WithdrawalFromTheLine(){
+		// Если на какой-то линии продвинулись дальше , то я после смерти иду туда
+		if (self.getDistanceTo(myBase)<=self.getRadius()*10 && isNearMyBase){
+			isNearMyBase = false;
+			LaneType lanePrev = lane;
+			lane = FindTheMostDistantMinion();
+			if(lane == null)
+				lane = lanePrev;
+		}else if(self.getDistanceTo(myBase)>self.getRadius()*10){
+			isNearMyBase = true;
+		}
+	}
 	private void MovementDuringTheAttack(){}
 	private void PositionChoice(){}			
 	
@@ -57,13 +74,34 @@ public final class MyStrategy implements Strategy {
 	private void AttacksStopCriterion(){} 	
 	private void DerogationCriteria(){} 	
 	
-	
-	private void SetVariables(Wizard self, World world, Game game, Move move){
-		setVariables = false;
+	private void InitTick(Wizard self, World world, Game game, Move move){
 		this.self = self;
 		this.world = world;
 		this.game = game;
 		this.move = move;
+		
+		List<Building> targets1 = new ArrayList<>();
+		targets1.addAll(Arrays.asList(world.getBuildings()));
+		
+		for (Building target : targets1) {
+			if(target.getType() == BuildingType.FACTION_BASE && target.getFaction() == self.getFaction()){
+				myBase = target;
+				break;
+			}
+		}
+		if(myBase.getX()==400)
+		{
+			notMyBase = new Point2D(3600,400);
+		}else
+			notMyBase = new Point2D(400,3600);
+		
+		initializeStrategy(self, game);
+
+	}
+	
+	private void SetVariables(){
+		setVariables = false;
+		
 		// пока это просто рандом в начале игры
 		int codeForState = (new Random()).nextInt()%3; 
 		switch(codeForState+1){
@@ -89,7 +127,6 @@ public final class MyStrategy implements Strategy {
 					
 		
 	}
-	
 	
 	private static final class Point2D {
 		private final double x;
@@ -120,7 +157,198 @@ public final class MyStrategy implements Strategy {
 			return getDistanceTo(unit.getX(), unit.getY());
 		}
 	}
+
+	// Здесь начинаются временные функции и переменные, которые в последствии будут заменены на более доработанные 
+	
+	private LaneType FindTheMostDistantMinion(){
+		List<LivingUnit> targets2 = new ArrayList<>();
+		
+		targets2.addAll(Arrays.asList(world.getMinions()));
+
+		LivingUnit nearestTarget = null;
+		double nearestTargetDistance = Double.MAX_VALUE;
+		
+		for (LivingUnit target : targets2) {
+			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() != self.getFaction()) {
+				continue;
+			}
+
+			double distance = notMyBase.getDistanceTo(target);
+			
+			if (distance < nearestTargetDistance) {
+				nearestTarget = target;
+				nearestTargetDistance = distance;
+			}
+			
+		}
+		if(nearestTarget == null)
+			return null;
+		return LaneChoice(nearestTarget);
+		//return lane;
+	}
+	
+	private LaneType LaneChoice(LivingUnit target){
+		LaneType TheLane = null;
+		double minDist = 4000;
+		
+		for(int j = 0;j<3;j++){
+			LaneType now;
+			if(j==0)now = LaneType.MIDDLE;
+			else if(j==1)now = LaneType.TOP;
+			else now = LaneType.BOTTOM;
+	
+			Point2D[] waypoints = waypointsByLane.get(now);
+			Point2D firstWaypoint = waypoints[0];
+			for (int waypointIndex = waypoints.length - 1; waypointIndex > 0; --waypointIndex) {
+				Point2D waypoint = waypoints[waypointIndex];
+				
+				if (waypoint.getDistanceTo(target) < minDist) {
+					minDist = waypoint.getDistanceTo(target);
+					if(j==0){
+						TheLane = LaneType.MIDDLE;}
+					else if(j==1)
+						TheLane = LaneType.TOP;
+					else TheLane = LaneType.BOTTOM;
+				}
+				//  - ?
+				/*if (firstWaypoint.getDistanceTo(waypoint) < firstWaypoint.getDistanceTo(target)) {
+					if(j==0)
+						return LaneType.MIDDLE;
+					else if(j==1)
+						return LaneType.TOP;
+					return LaneType.BOTTOM;
+				}*/
+			}
+		}
+		
+		return TheLane;
+	}
+	private static final double WAYPOINT_RADIUS = 100.0D;
+	
+	private Random random;
+	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
+	private LaneType lane = null;
+	private Point2D[] waypoints;
+	private void initializeStrategy(Wizard self, Game game) {
+		if (random == null) {
+			random = new Random(game.getRandomSeed());
+
+			double mapSize = game.getMapSize();
+
+			waypointsByLane.put(LaneType.MIDDLE,
+					new Point2D[] { new Point2D(100.0D, mapSize - 100.0D),
+							random.nextBoolean() ? new Point2D(600.0D, mapSize - 200.0D)
+									: new Point2D(200.0D, mapSize - 600.0D),
+							new Point2D(800.0D, mapSize - 800.0D), new Point2D(mapSize - 600.0D, 600.0D) });
+
+			waypointsByLane.put(LaneType.TOP,
+					new Point2D[] { new Point2D(100.0D, mapSize - 100.0D), new Point2D(100.0D, mapSize - 400.0D),
+							new Point2D(200.0D, mapSize - 800.0D), new Point2D(200.0D, mapSize * 0.75D),
+							new Point2D(200.0D, mapSize * 0.5D), new Point2D(200.0D, mapSize * 0.25D),
+							new Point2D(200.0D, 200.0D), new Point2D(mapSize * 0.25D, 200.0D),
+							new Point2D(mapSize * 0.5D, 200.0D), new Point2D(mapSize * 0.75D, 200.0D),
+							new Point2D(mapSize - 200.0D, 200.0D) });
+
+			waypointsByLane.put(LaneType.BOTTOM, new Point2D[] { new Point2D(100.0D, mapSize - 100.0D),
+					new Point2D(400.0D, mapSize - 100.0D), new Point2D(800.0D, mapSize - 200.0D),
+					new Point2D(mapSize * 0.25D, mapSize - 200.0D), new Point2D(mapSize * 0.5D, mapSize - 200.0D),
+					new Point2D(mapSize * 0.75D, mapSize - 200.0D), new Point2D(mapSize - 200.0D, mapSize - 200.0D),
+					new Point2D(mapSize - 200.0D, mapSize * 0.75D), new Point2D(mapSize - 200.0D, mapSize * 0.5D),
+					new Point2D(mapSize - 200.0D, mapSize * 0.25D), new Point2D(mapSize - 200.0D, 200.0D) });
+
+				}
+		if(lane == null)
+			switch ((int) self.getId()) {
+			case 1:
+			case 2:
+			case 6:
+			case 7:
+				lane = LaneType.TOP;
+				break;
+			case 3:
+			case 8:
+				lane = LaneType.MIDDLE;
+				break;
+			case 4:
+			case 5:
+			case 9:
+			case 10:
+				lane = LaneType.BOTTOM;
+				break;
+			default:
+			}
+
+		
+	}
+	
+	private Point2D getNextWaypoint() {
+		int lastWaypointIndex = waypoints.length - 1;
+		Point2D lastWaypoint = waypoints[lastWaypointIndex];
+
+		for (int waypointIndex = 0; waypointIndex < lastWaypointIndex; ++waypointIndex) {
+			Point2D waypoint = waypoints[waypointIndex];
+
+			if (waypoint.getDistanceTo(self) <= WAYPOINT_RADIUS) {
+				return waypoints[waypointIndex + 1];
+			}
+
+			if (lastWaypoint.getDistanceTo(waypoint) < lastWaypoint.getDistanceTo(self)) {
+				return waypoint;
+			}
+		}
+
+		return lastWaypoint;
+	}
+
+	private void goTo(Point2D point, boolean saveAngle) {
+		final int maxSpeed = 54;
+		double angle = self.getAngleTo(point.getX(), point.getY());
+		if (saveAngle == false) {
+			move.setTurn(angle);
+			if (StrictMath.abs(angle) < game.getStaffSector() / 4.0D) {
+				move.setSpeed(game.getWizardForwardSpeed());
+			}
+		} else {
+			Double Tan = Math.tan(angle);
+			if (angle == Math.PI / 2) {
+				move.setStrafeSpeed(maxSpeed);
+				move.setSpeed(0);
+			}
+			if (angle == -1* Math.PI / 2) {
+				move.setStrafeSpeed(-1*maxSpeed);
+				move.setSpeed(0);
+
+			}
+			
+			double speedR = Math.abs(game.getWizardStrafeSpeed());
+			double speedB = -1*Math.abs(game.getWizardBackwardSpeed());
+			int sign = 1;
+			if (angle < 0){
+				sign = -1;
+				angle = sign * angle;
+				//angle = 2*Math.PI - angle;
+			}
+			if((angle>Math.atan(speedR/game.getWizardForwardSpeed()))&&(angle<3*Math.PI/4)){
+				move.setStrafeSpeed(sign*speedR);
+				//if(angle > Math.PI/2)
+				move.setSpeed(Tan/speedR);
+			}
+			else{
+				double speed = speedB;
+				if(angle < Math.PI/2){
+					speed = game.getWizardForwardSpeed();
+				}
+				move.setStrafeSpeed(sign*Math.abs(Tan*speed));
+				move.setSpeed(speed);
+			
+			}
+			
+		}
+
+	}
+
 }
+
 
 	
 	
@@ -128,13 +356,7 @@ public final class MyStrategy implements Strategy {
 /*
 	private static final double WAYPOINT_RADIUS = 100.0D;
 	private static double LOW_HP_FACTOR = 0.5D;
-	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
-
-	private Random random;
-
-	private LaneType lane;
-	private Point2D[] waypoints;
-
+	
 	// константа для дистанции , если она не определена
 	private final double wrongDistance = -1;
 	// последнее изменение позиции
@@ -152,8 +374,6 @@ public final class MyStrategy implements Strategy {
 		if (game.getTickCount() == 1){
 			damagedLife = prevLife = self.getMaxLife();
 		}
-		initializeStrategy(self, game);
-		initializeTick(self, world, game, move);
 		if (prevLife > self.getLife()){
 			damagedLife = prevLife;
 			LOW_HP_FACTOR = 0.5D;
@@ -228,58 +448,7 @@ public final class MyStrategy implements Strategy {
 		}
 		return false;
 	}
-	private void initializeStrategy(Wizard self, Game game) {
-		if (random == null) {
-			random = new Random(game.getRandomSeed());
-
-			double mapSize = game.getMapSize();
-
-			waypointsByLane.put(LaneType.MIDDLE,
-					new Point2D[] { new Point2D(100.0D, mapSize - 100.0D),
-							random.nextBoolean() ? new Point2D(600.0D, mapSize - 200.0D)
-									: new Point2D(200.0D, mapSize - 600.0D),
-							new Point2D(800.0D, mapSize - 800.0D), new Point2D(mapSize - 600.0D, 600.0D) });
-
-			waypointsByLane.put(LaneType.TOP,
-					new Point2D[] { new Point2D(100.0D, mapSize - 100.0D), new Point2D(100.0D, mapSize - 400.0D),
-							new Point2D(200.0D, mapSize - 800.0D), new Point2D(200.0D, mapSize * 0.75D),
-							new Point2D(200.0D, mapSize * 0.5D), new Point2D(200.0D, mapSize * 0.25D),
-							new Point2D(200.0D, 200.0D), new Point2D(mapSize * 0.25D, 200.0D),
-							new Point2D(mapSize * 0.5D, 200.0D), new Point2D(mapSize * 0.75D, 200.0D),
-							new Point2D(mapSize - 200.0D, 200.0D) });
-
-			waypointsByLane.put(LaneType.BOTTOM, new Point2D[] { new Point2D(100.0D, mapSize - 100.0D),
-					new Point2D(400.0D, mapSize - 100.0D), new Point2D(800.0D, mapSize - 200.0D),
-					new Point2D(mapSize * 0.25D, mapSize - 200.0D), new Point2D(mapSize * 0.5D, mapSize - 200.0D),
-					new Point2D(mapSize * 0.75D, mapSize - 200.0D), new Point2D(mapSize - 200.0D, mapSize - 200.0D),
-					new Point2D(mapSize - 200.0D, mapSize * 0.75D), new Point2D(mapSize - 200.0D, mapSize * 0.5D),
-					new Point2D(mapSize - 200.0D, mapSize * 0.25D), new Point2D(mapSize - 200.0D, 200.0D) });
-
-			switch ((int) self.getId()) {
-			case 1:
-			case 2:
-			case 6:
-			case 7:
-				lane = LaneType.TOP;
-				break;
-			case 3:
-			case 8:
-				lane = LaneType.MIDDLE;
-				break;
-			case 4:
-			case 5:
-			case 9:
-			case 10:
-				lane = LaneType.BOTTOM;
-				break;
-			default:
-			}
-
-			waypoints = waypointsByLane.get(lane);
-
-		}
-	}
-
+	
 	
 
 	private Point2D getNextWaypoint() {
@@ -319,52 +488,7 @@ public final class MyStrategy implements Strategy {
 		return firstWaypoint;
 	}
 
-	private void goTo(Point2D point, boolean saveAngle) {
-		final int maxSpeed = 54;
-		double angle = self.getAngleTo(point.getX(), point.getY());
-		if (saveAngle == false) {
-			move.setTurn(angle);
-			if (StrictMath.abs(angle) < game.getStaffSector() / 4.0D) {
-				move.setSpeed(game.getWizardForwardSpeed());
-			}
-		} else {
-			Double Tan = Math.tan(angle);
-			if (angle == Math.PI / 2) {
-				move.setStrafeSpeed(maxSpeed);
-				move.setSpeed(0);
-			}
-			if (angle == -1* Math.PI / 2) {
-				move.setStrafeSpeed(-1*maxSpeed);
-				move.setSpeed(0);
 
-			}
-			
-			double speedR = Math.abs(game.getWizardStrafeSpeed());
-			double speedB = -1*Math.abs(game.getWizardBackwardSpeed());
-			int sign = 1;
-			if (angle < 0){
-				sign = -1;
-				angle = sign * angle;
-				//angle = 2*Math.PI - angle;
-			}
-			if((angle>Math.atan(speedR/game.getWizardForwardSpeed()))&&(angle<3*Math.PI/4)){
-				move.setStrafeSpeed(sign*speedR);
-				//if(angle > Math.PI/2)
-				move.setSpeed(Tan/speedR);
-			}
-			else{
-				double speed = speedB;
-				if(angle < Math.PI/2){
-					speed = game.getWizardForwardSpeed();
-				}
-				move.setStrafeSpeed(sign*Math.abs(Tan*speed));
-				move.setSpeed(speed);
-			
-			}
-			
-		}
-
-	}
 
 	private LivingUnit getNearestTarget() {
 		List<LivingUnit> targets = new ArrayList<>();
