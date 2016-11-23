@@ -10,7 +10,7 @@ public final class MyStrategy implements Strategy {
 
 	private Random random;
 
-	private LaneType lane;
+	private LaneType lane = null;
 	private Point2D[] waypoints;
 
 	private Wizard self;
@@ -23,16 +23,117 @@ public final class MyStrategy implements Strategy {
 	private static double changingPosition = 0;
 	// предыдущая позиция
 	private static Point2D prevPos = new Point2D(0, 0);
+	private static int countDownBack = 0;
 	private static double prevLife;
 	private static double damagedLife;
+	private static Building myBase = null; 
+	private static Point2D notMyBase = null;
+	private static boolean isNearMyBase = true;
+	private LaneType FindTheMostDistantMinion(){
+		List<LivingUnit> targets2 = new ArrayList<>();
+		
+		targets2.addAll(Arrays.asList(world.getMinions()));
+
+		LivingUnit nearestTarget = null;
+		double nearestTargetDistance = Double.MAX_VALUE;
+		
+		for (LivingUnit target : targets2) {
+			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() != self.getFaction()) {
+				continue;
+			}
+
+			double distance = notMyBase.getDistanceTo(target);
+			
+			if (distance < nearestTargetDistance) {
+				nearestTarget = target;
+				nearestTargetDistance = distance;
+			}
+			
+		}
+		if(nearestTarget == null)
+			return null;
+		return LaneChoice(nearestTarget);
+		//return lane;
+	}
+	private LaneType LaneChoice(LivingUnit target){
+		LaneType TheLane = null;
+		double minDist = 4000;
+		
+		for(int j = 0;j<3;j++){
+			LaneType now;
+			if(j==0)now = LaneType.MIDDLE;
+			else if(j==1)now = LaneType.TOP;
+			else now = LaneType.BOTTOM;
 	
+			Point2D[] waypoints = waypointsByLane.get(now);
+			Point2D firstWaypoint = waypoints[0];
+			for (int waypointIndex = waypoints.length - 1; waypointIndex > 0; --waypointIndex) {
+				Point2D waypoint = waypoints[waypointIndex];
+				
+				if (waypoint.getDistanceTo(target) < minDist) {
+					minDist = waypoint.getDistanceTo(target);
+					if(j==0){
+						TheLane = LaneType.MIDDLE;}
+					else if(j==1)
+						TheLane = LaneType.TOP;
+					else TheLane = LaneType.BOTTOM;
+				}
+				//  - ?
+				/*if (firstWaypoint.getDistanceTo(waypoint) < firstWaypoint.getDistanceTo(target)) {
+					if(j==0)
+						return LaneType.MIDDLE;
+					else if(j==1)
+						return LaneType.TOP;
+					return LaneType.BOTTOM;
+				}*/
+			}
+		}
+		
+		return TheLane;
+	}
+	
+	private void WithdrawalFromTheLine(){
+		// Если на какой-то линии продвинулись дальше , то я после смерти иду туда
+		if (self.getDistanceTo(myBase)<=self.getRadius()*10 && isNearMyBase){
+			isNearMyBase = false;
+			LaneType lanePrev = lane;
+			lane = FindTheMostDistantMinion();
+			if(lane == null)
+				lane = lanePrev;
+		}else if(self.getDistanceTo(myBase)>self.getRadius()*10){
+			isNearMyBase = true;
+		}
+	}
+	
+	private static int sign  = -1;
+	private static int sign2  = -1;
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
+		Point2D curPos = new Point2D(self.getX(), self.getY());
+		
+		if(countDownBack != 0){
+			if(countDownBack%20 ==0){
+				sign = (new Random()).nextInt()%2 == 0?-1:1;
+				sign2 = (new Random()).nextInt()%2 == 0?-1:1;
+			}
+			
+			//goTo(getPreviousWaypoint(),true);
+			move.setStrafeSpeed(3*sign);
+			move.setSpeed(3*sign2);
+			move.setAction(ActionType.STAFF);
+			countDownBack++;
+			if(curPos.getDistanceTo(prevPos)>=self.getRadius())
+				countDownBack=0;
+			return;
+		}
 		if (game.getTickCount() == 1){
 			damagedLife = prevLife = self.getMaxLife();
 		}
-		initializeStrategy(self, game);
 		initializeTick(self, world, game, move);
+		
+		WithdrawalFromTheLine();	//Уход с линии
+		
+		initializeStrategy(self, game);
 		if (prevLife > self.getLife()){
 			damagedLife = prevLife;
 			LOW_HP_FACTOR = 0.5D;
@@ -46,6 +147,19 @@ public final class MyStrategy implements Strategy {
 		// определяем дистанцию до ближайшей цели
 		LivingUnit nearestTarget = getNearestTarget();
 		double distance = wrongDistance;
+		// выходим из тупика
+		if (prevPos.equals(curPos)) {
+			changingPosition++;
+			if (changingPosition == 15) {
+				countDownBack=1;
+				move.setAction(ActionType.STAFF);
+				goTo(getPreviousWaypoint(),false);
+				return;
+			}
+		} else {
+			changingPosition = 0;
+			prevPos = curPos;
+		}
 		if (nearestTarget != null) {
 			distance = self.getDistanceTo(nearestTarget);
 			// отходим при малых хп
@@ -60,19 +174,7 @@ public final class MyStrategy implements Strategy {
 				setAttack(self.getDistanceTo(getNearestTargetWithLowestHP()),getNearestTargetWithLowestHP());
 				return;
 			}
-			// выходим из тупика
-			Point2D curPos = new Point2D(self.getX(), self.getY());
-			if (prevPos == curPos) {
-				changingPosition++;
-				if (changingPosition == 5) {
-					move.setAction(ActionType.STAFF);
-					goTo(getPreviousWaypoint(),false);
-					return;
-				}
-			} else {
-				changingPosition = 0;
-				prevPos = curPos;
-			}
+			
 			// из-за этого он дёргается
 			if (distance <= 600)
 				move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
@@ -133,7 +235,7 @@ public final class MyStrategy implements Strategy {
 					new Point2D(mapSize * 0.75D, mapSize - 200.0D), new Point2D(mapSize - 200.0D, mapSize - 200.0D),
 					new Point2D(mapSize - 200.0D, mapSize * 0.75D), new Point2D(mapSize - 200.0D, mapSize * 0.5D),
 					new Point2D(mapSize - 200.0D, mapSize * 0.25D), new Point2D(mapSize - 200.0D, 200.0D) });
-
+			if(lane==null)
 			switch ((int) self.getId()) {
 			case 1:
 			case 2:
@@ -154,9 +256,10 @@ public final class MyStrategy implements Strategy {
 			default:
 			}
 
-			waypoints = waypointsByLane.get(lane);
+		
 
 		}
+		waypoints = waypointsByLane.get(lane);
 	}
 
 	private void initializeTick(Wizard self, World world, Game game, Move move) {
@@ -164,6 +267,20 @@ public final class MyStrategy implements Strategy {
 		this.world = world;
 		this.game = game;
 		this.move = move;
+		List<Building> targets1 = new ArrayList<>();
+		targets1.addAll(Arrays.asList(world.getBuildings()));
+		
+		for (Building target : targets1) {
+			if(target.getType() == BuildingType.FACTION_BASE && target.getFaction() == self.getFaction()){
+				myBase = target;
+				break;
+			}
+		}
+		if(myBase.getX()==400)
+		{
+			notMyBase = new Point2D(3600,400);
+		}else
+			notMyBase = new Point2D(400,3600);
 	}
 
 	private Point2D getNextWaypoint() {
@@ -331,7 +448,11 @@ public final class MyStrategy implements Strategy {
 			this.x = x;
 			this.y = y;
 		}
-
+		public boolean equals(Point2D p){
+			if(p.x ==this.x && p.y == this.y)
+				return true;
+			return false;
+		}
 		public double getX() {
 			return x;
 		}
