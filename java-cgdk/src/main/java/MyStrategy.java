@@ -11,7 +11,7 @@ public final class MyStrategy implements Strategy {
 	private Random random;
 
 	private LaneType lane = null;
-	private Point2D[] waypoints;
+	private static Point2D[] waypoints;
 
 	private Wizard self;
 	private World world;
@@ -107,14 +107,85 @@ public final class MyStrategy implements Strategy {
 	
 	private static int sign  = -1;
 	private static int sign2  = -1;
+	private static boolean took = true;
+	private static boolean goBack = false;
+	private void go(Point2D p){
+		double angle = self.getAngleTo(p.getX(),p.getY());
+		move.setTurn(angle);
+		if (StrictMath.abs(angle) < game.getStaffSector() / 4.0D) {
+			move.setSpeed(game.getWizardForwardSpeed());
+		}
+		move.setAction(ActionType.STAFF);
+		
+	}
 	@Override
 	public void move(Wizard self, World world, Game game, Move move) {
 		Point2D curPos = new Point2D(self.getX(), self.getY());
 		
-		if(countDownBack != 0){
+		 if(goBack==true&&took==true/*&& curPos.getDistanceTo(getNextWaypoint())>200*/){
+				double dist1 =curPos.getDistanceTo(new Point2D(200,200));
+				double dist2 =curPos.getDistanceTo(new Point2D(2000,2000));
+				double dist3 =curPos.getDistanceTo(new Point2D(3400,3400));
+				Point2D p = null;
+				if(dist1 < dist2)
+					if(dist3<dist1){
+						p = new Point2D(3400,3400);
+						lane = LaneType.BOTTOM;
+						}
+					else{
+						p = new Point2D(200,200);
+						lane = LaneType.TOP;	
+					}
+					else if(dist3<dist2){
+						p = new Point2D(3400,3400);
+						lane = LaneType.BOTTOM;
+					}
+					else{
+						p = new Point2D(2000,2000);
+						lane = LaneType.MIDDLE;
+					}
+				double angle = self.getAngleTo(p.x,p.y);
+				move.setTurn(angle);
+				if (StrictMath.abs(angle) < game.getStaffSector() / 4.0D) {
+					move.setSpeed(game.getWizardForwardSpeed());
+				}
+				move.setAction(ActionType.STAFF);
+				
+				if(curPos.getDistanceTo(p)<200)
+					goBack = false;
+					//	go(new Point2D(2000,2000));}
+				return;
+			}
+		
+		if((took==false)||((curPos.getX()+400>=curPos.getY())&&(curPos.getX()-400<=curPos.getY()))){
+			if(took==false||(game.getBonusAppearanceIntervalTicks() - world.getTickIndex()%game.getBonusAppearanceIntervalTicks())<=200){
+				took=false;
+			
+				Point2D bonus = null;
+				if(curPos.getDistanceTo(new Point2D(1200,1200))<curPos.getDistanceTo(new Point2D(2800,2800)) )
+					bonus = new Point2D(1200,1200);
+				else bonus = new Point2D(2800,2800);
+				double angle = self.getAngleTo(bonus.x,bonus.y);
+				move.setTurn(angle);
+				if (StrictMath.abs(angle) < game.getStaffSector() / 4.0D) {
+					move.setSpeed(game.getWizardForwardSpeed());
+				}
+				move.setAction(ActionType.STAFF);
+				//goTo(bonus, false);
+				if(curPos.getDistanceTo(bonus)<=game.getBonusRadius()){
+					took = true;
+					goBack= true;
+				}
+				return;
+			}
+		}else
+			goBack=false	;
+			
+		
+		if(countDownBack != 0 && countDownBack<500){
 			if(countDownBack%20 ==0){
-				sign = (new Random()).nextInt()%2 == 0?-1:1;
-				sign2 = (new Random()).nextInt()%2 == 0?-1:1;
+				sign = (new Random()).nextInt(Math.abs((int)System.currentTimeMillis()))%2 == 0?-1:1;
+				sign2 = (new Random()).nextInt(Math.abs((int)System.currentTimeMillis()))%2 == 0?-1:1;
 			}
 			
 			//goTo(getPreviousWaypoint(),true);
@@ -122,7 +193,7 @@ public final class MyStrategy implements Strategy {
 			move.setSpeed(3*sign2);
 			move.setAction(ActionType.STAFF);
 			countDownBack++;
-			if(curPos.getDistanceTo(prevPos)>=self.getRadius())
+			if(curPos.getDistanceTo(prevPos)>=self.getRadius()/2)
 				countDownBack=0;
 			return;
 		}
