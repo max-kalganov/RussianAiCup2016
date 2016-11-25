@@ -2,6 +2,8 @@ import model.*;
 
 import java.util.*;
 
+import com.sun.org.apache.bcel.internal.generic.SWAP;
+
 public final class MyStrategy implements Strategy {
 	private static enum state {
 	    tank, support, cerry
@@ -15,7 +17,8 @@ public final class MyStrategy implements Strategy {
 	private static boolean setVariables = true;
 	private static Building myBase = null; 
 	private static Point2D notMyBase = null; 
-	
+	private static int skipMoving = 0;
+	private static int skipAttack = 0;
 	
 	private Wizard self;
 	private World world;
@@ -36,50 +39,31 @@ public final class MyStrategy implements Strategy {
 	}
 	
 	private void Moving(){	
-		WithdrawalFromTheLine();	//Уход с линии
-		LineChoice();				//Выбор линии
-		BonusSelection();			//Подбор бонусов
-		MovementDuringTheAttack();	//Движение во время атаки
-		PositionChoice();			//Выбор позиции для атаки
+		if(IfNearTarget()){		// должно быть первым,чтобы отключить любую ходьбу и начать двигаться в зависимости от атаки
+			skipMoving = 0; 
+			goBack = false;
+		}
+		if(skipMoving==0||skipMoving==1)MovementDuringTheAttack();	//Движение во время атаки(выбор дистанции до противника/цели + отступление)	
+		if(skipMoving==0||skipMoving==2)WithdrawalFromTheLine();	//Уход с линии
+		if(skipMoving==0||skipMoving==3)LineChoice();				//Выбор линии
+		if(skipMoving==0||skipMoving==4)BonusSelection();			//Подбор бонусов															-- have
+		if(skipMoving==0||skipMoving==5)PositionChoice();			//Выбор позиции для атаки(выбор положения относительно окружающих юнитов)
 		goTo(getNextWaypoint(),false);
 	}
 	
 	private void Attack(){
-		TargetChoice();				//Выбор цели
-		AttacksStopCriterion();		//Критерий остановки атаки цели
-		DerogationCriteria();		//Критерий отступления
+		if(skipAttack==0||skipAttack==1)TargetChoice();			//Выбор цели						--have
+		if(skipAttack==0||skipAttack==1)AttacksStopCriterion();	//Критерий остановки атаки цели	
+		if(skipAttack==0||skipAttack==1)DerogationCriteria();		//Критерий отступления				--have
 	}
-	// Block Moving
-	private void LineChoice(){
-		waypoints = waypointsByLane.get(lane);
-	} 	
-	private void BonusSelection(){}			
-	private void WithdrawalFromTheLine(){
-		// Если на какой-то линии продвинулись дальше , то я после смерти иду туда
-		if (self.getDistanceTo(myBase)<=self.getRadius()*10 && isNearMyBase){
-			isNearMyBase = false;
-			LaneType lanePrev = lane;
-			lane = FindTheMostDistantMinion();
-			if(lane == null)
-				lane = lanePrev;
-		}else if(self.getDistanceTo(myBase)>self.getRadius()*10){
-			isNearMyBase = true;
-		}
-	}
-	private void MovementDuringTheAttack(){}
-	private void PositionChoice(){}			
 	
-	// Block Attack
-	private void TargetChoice(){} 			
-	private void AttacksStopCriterion(){} 	
-	private void DerogationCriteria(){} 	
-	
+
 	private void InitTick(Wizard self, World world, Game game, Move move){
 		this.self = self;
 		this.world = world;
 		this.game = game;
 		this.move = move;
-		
+		curPos = new Point2D(self.getX(), self.getY());
 		List<Building> targets1 = new ArrayList<>();
 		targets1.addAll(Arrays.asList(world.getBuildings()));
 		
@@ -98,10 +82,8 @@ public final class MyStrategy implements Strategy {
 		initializeStrategy(self, game);
 
 	}
-	
 	private void SetVariables(){
 		setVariables = false;
-		
 		// пока это просто рандом в начале игры
 		int codeForState = (new Random()).nextInt()%3; 
 		switch(codeForState+1){
@@ -127,6 +109,65 @@ public final class MyStrategy implements Strategy {
 					
 		
 	}
+	
+	// Block Moving
+	private void LineChoice(){
+		waypoints = waypointsByLane.get(lane);
+	} 	
+	private boolean IfNearTarget(){
+		LivingUnit nearestTarget = getNearestTarget();
+		return nearestTarget == null?false:true;
+	}
+	private void BonusSelection(){
+		if(goBack==true&&took==true){
+			if(curPos.getDistanceTo(nextWaypoint)<200){
+				goBack = false;
+				skipMoving = 0;
+				nextWaypoint = null;
+			}
+		}
+		if((took==false)||((curPos.getX()+400>=curPos.getY())&&(curPos.getX()-400<=curPos.getY()))){
+			if(took==false||(game.getBonusAppearanceIntervalTicks() - world.getTickIndex()%game.getBonusAppearanceIntervalTicks())<=200){
+				took=false;
+				Point2D bonus = null;
+				if(curPos.getDistanceTo(new Point2D(1200,1200))<curPos.getDistanceTo(new Point2D(2800,2800)) )
+					bonus = new Point2D(1200,1200);
+				else bonus = new Point2D(2800,2800);
+				
+				nextWaypoint = bonus;
+				
+				if(curPos.getDistanceTo(bonus)<=game.getBonusRadius()){
+					took = true;
+					goBack= true;
+					skipMoving = 4;
+					SetLaneAndWaypoint(); // функция для задания линии и точки 
+				}
+				return;
+			}
+		}
+	}		
+	
+	private void WithdrawalFromTheLine(){
+		// Если на какой-то линии продвинулись дальше , то я после смерти иду туда
+		if (self.getDistanceTo(myBase)<=self.getRadius()*10 && isNearMyBase){
+			isNearMyBase = false;
+			LaneType lanePrev = lane;
+			lane = FindTheMostDistantMinion(1);
+			if(lane == null)
+				lane = lanePrev;
+		}else if(self.getDistanceTo(myBase)>self.getRadius()*10){
+			isNearMyBase = true;
+		}
+	}
+	private void MovementDuringTheAttack(){}
+	private void PositionChoice(){}			
+	
+	// Block Attack
+	private void TargetChoice(){} 			
+	private void AttacksStopCriterion(){} 	
+	private void DerogationCriteria(){} 	
+	
+	
 	
 	private static final class Point2D {
 		private final double x;
@@ -157,16 +198,44 @@ public final class MyStrategy implements Strategy {
 			return getDistanceTo(unit.getX(), unit.getY());
 		}
 	}
-
+	private void SetLaneAndWaypoint(){
+		LaneType laneAsVariant = FindTheMostDistantMinion(1);
+		if ( curPos.getDistanceTo(new Point2D(1200,1200))
+			<curPos.getDistanceTo(new Point2D(2800,2800))){
+			if(laneAsVariant== LaneType.BOTTOM){
+				lane = FindTheMostDistantMinion(2);
+			}
+			else{ 
+		 		lane = laneAsVariant;
+		 	}
+		}else{
+		 	if(laneAsVariant== LaneType.TOP)
+		 		lane = FindTheMostDistantMinion(2);
+		 	else lane = laneAsVariant;
+		}
+		int point = 200;
+		if (lane == LaneType.MIDDLE)
+			point = 2000;
+	 	else if (lane == LaneType.BOTTOM)
+	 		point = 3400;
+			 	
+		Point2D p = new Point2D(point,point);	
+		nextWaypoint = p;
+	}
+	
 	// Здесь начинаются временные функции и переменные, которые в последствии будут заменены на более доработанные 
 	
-	private LaneType FindTheMostDistantMinion(){
+	private LaneType FindTheMostDistantMinion(int num){
 		List<LivingUnit> targets2 = new ArrayList<>();
-		
 		targets2.addAll(Arrays.asList(world.getMinions()));
-
-		LivingUnit nearestTarget = null;
-		double nearestTargetDistance = Double.MAX_VALUE;
+		
+		LivingUnit nearestTarget1 = null;
+		LivingUnit nearestTarget2 = null;
+		LaneType resLane1 = LaneType.MIDDLE;
+		LaneType resLane2 = LaneType.MIDDLE;
+		double nearestTargetDistance1 = Double.MAX_VALUE;
+		double nearestTargetDistance2 = Double.MAX_VALUE;
+		
 		
 		for (LivingUnit target : targets2) {
 			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() != self.getFaction()) {
@@ -175,18 +244,33 @@ public final class MyStrategy implements Strategy {
 
 			double distance = notMyBase.getDistanceTo(target);
 			
-			if (distance < nearestTargetDistance) {
-				nearestTarget = target;
-				nearestTargetDistance = distance;
+
+			if (distance < nearestTargetDistance1) {
+				LaneType l;
+				if((l = LaneChoice(target))!=resLane1){
+					nearestTarget2 = nearestTarget1;
+					resLane2 = resLane1;
+					nearestTargetDistance2 = nearestTargetDistance1;
+					resLane1 = l;
+				}
+				nearestTarget1 = target;
+				nearestTargetDistance1 = distance;
+				continue;
 			}
 			
+			if (distance < nearestTargetDistance2) {
+				resLane2 = LaneChoice(target);
+				nearestTarget2 = target;
+				nearestTargetDistance2 = distance;
+			}			
 		}
-		if(nearestTarget == null)
+		if(nearestTarget1 == null)
 			return null;
-		return LaneChoice(nearestTarget);
-		//return lane;
+		if(num == 1)
+			return resLane1;
+		return resLane2;
 	}
-	
+	private Point2D curPos;
 	private LaneType LaneChoice(LivingUnit target){
 		LaneType TheLane = null;
 		double minDist = 4000;
@@ -229,6 +313,12 @@ public final class MyStrategy implements Strategy {
 	private final Map<LaneType, Point2D[]> waypointsByLane = new EnumMap<>(LaneType.class);
 	private LaneType lane = null;
 	private Point2D[] waypoints;
+	private static Point2D nextWaypoint = null; 
+	private static int sign  = -1;
+	private static int sign2  = -1;
+	private static boolean took = true;
+	private static boolean goBack = false;
+	
 	private void initializeStrategy(Wizard self, Game game) {
 		if (random == null) {
 			random = new Random(game.getRandomSeed());
@@ -282,6 +372,8 @@ public final class MyStrategy implements Strategy {
 	}
 	
 	private Point2D getNextWaypoint() {
+		if (nextWaypoint != null)
+			return nextWaypoint;
 		int lastWaypointIndex = waypoints.length - 1;
 		Point2D lastWaypoint = waypoints[lastWaypointIndex];
 
@@ -346,150 +438,6 @@ public final class MyStrategy implements Strategy {
 		}
 
 	}
-
-}
-
-
-	
-	
-
-/*
-	private static final double WAYPOINT_RADIUS = 100.0D;
-	private static double LOW_HP_FACTOR = 0.5D;
-	
-	// константа для дистанции , если она не определена
-	private final double wrongDistance = -1;
-	// последнее изменение позиции
-	private static double changingPosition = 0;
-	// предыдущая позиция
-	private static Point2D prevPos = new Point2D(0, 0);
-	private static double prevLife;
-	private static double damagedLife;
-
-	
-	
-	
-	
-	private void SomeFunc(Wizard self, World world, Game game, Move move){
-		if (game.getTickCount() == 1){
-			damagedLife = prevLife = self.getMaxLife();
-		}
-		if (prevLife > self.getLife()){
-			damagedLife = prevLife;
-			LOW_HP_FACTOR = 0.5D;
-		}else{
-			if (prevLife >= damagedLife && prevLife > self.getMaxLife()*0.25D){
-				LOW_HP_FACTOR = 0.25D;
-				damagedLife = prevLife; 
-				}
-		}
-		prevLife = self.getLife();
-		// определяем дистанцию до ближайшей цели
-		LivingUnit nearestTarget = getNearestTarget();
-		double distance = wrongDistance;
-		if (nearestTarget != null) {
-			distance = self.getDistanceTo(nearestTarget);
-			// отходим при малых хп
-			if ((self.getLife() < self.getMaxLife() * LOW_HP_FACTOR) && (distance < 600)) {
-				goTo(getPreviousWaypoint(),true);
-				setAttack(distance,nearestTarget);
-				return;
-			}
-			// отходим , если противник ближе 300 (500 - дальность стрельбы)
-			if ((distance != wrongDistance) && (distance <= 300)) {
-				goTo(getPreviousWaypoint(),true);
-				setAttack(self.getDistanceTo(getNearestTargetWithLowestHP()),getNearestTargetWithLowestHP());
-				return;
-			}
-			// выходим из тупика
-			Point2D curPos = new Point2D(self.getX(), self.getY());
-			if (prevPos == curPos) {
-				changingPosition++;
-				if (changingPosition == 5) {
-					move.setAction(ActionType.STAFF);
-					goTo(getPreviousWaypoint(),false);
-					return;
-				}
-			} else {
-				changingPosition = 0;
-				prevPos = curPos;
-			}
-			// из-за этого он дёргается
-			if (distance <= 600)
-				move.setStrafeSpeed(random.nextBoolean() ? game.getWizardStrafeSpeed() : -game.getWizardStrafeSpeed());
-			if (getNearestTargetWithLowestHP() != null){			
-				if(setAttack(self.getDistanceTo(getNearestTargetWithLowestHP()),getNearestTargetWithLowestHP()))
-					return;
-			}else 
-				if(setAttack(distance,nearestTarget))
-					return;
-			
-		}
-
-		// Åñëè íåò äðóãèõ äåéñòâèé, ïðîñòî ïðîäâèãàåìñÿ âïåðžä.
-		goTo(getNextWaypoint(),false);
-	}
-	
-	private boolean setAttack(double distance,LivingUnit nearestTarget){
-
-		if (distance <= self.getCastRange()) {
-			// узнаём угол до врага
-			double angle = self.getAngleTo(nearestTarget);
-			// поворачиваемся
-			move.setTurn(angle);
-
-			if (StrictMath.abs(angle) < game.getStaffSector() / 2.0D) {
-				move.setAction(ActionType.MAGIC_MISSILE);
-				move.setCastAngle(angle);
-				move.setMinCastDistance(distance - nearestTarget.getRadius() + game.getMagicMissileRadius());
-			}
-			return true;
-			
-		}
-		return false;
-	}
-	
-	
-
-	private Point2D getNextWaypoint() {
-		int lastWaypointIndex = waypoints.length - 1;
-		Point2D lastWaypoint = waypoints[lastWaypointIndex];
-
-		for (int waypointIndex = 0; waypointIndex < lastWaypointIndex; ++waypointIndex) {
-			Point2D waypoint = waypoints[waypointIndex];
-
-			if (waypoint.getDistanceTo(self) <= WAYPOINT_RADIUS) {
-				return waypoints[waypointIndex + 1];
-			}
-
-			if (lastWaypoint.getDistanceTo(waypoint) < lastWaypoint.getDistanceTo(self)) {
-				return waypoint;
-			}
-		}
-
-		return lastWaypoint;
-	}
-
-	private Point2D getPreviousWaypoint() {
-		Point2D firstWaypoint = waypoints[0];
-
-		for (int waypointIndex = waypoints.length - 1; waypointIndex > 0; --waypointIndex) {
-			Point2D waypoint = waypoints[waypointIndex];
-
-			if (waypoint.getDistanceTo(self) <= WAYPOINT_RADIUS) {
-				return waypoints[waypointIndex - 1];
-			}
-
-			if (firstWaypoint.getDistanceTo(waypoint) < firstWaypoint.getDistanceTo(self)) {
-				return waypoint;
-			}
-		}
-
-		return firstWaypoint;
-	}
-
-
-
 	private LivingUnit getNearestTarget() {
 		List<LivingUnit> targets = new ArrayList<>();
 		targets.addAll(Arrays.asList(world.getBuildings()));
@@ -503,7 +451,7 @@ public final class MyStrategy implements Strategy {
 			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() == self.getFaction()) {
 				continue;
 			}
-
+			
 			double distance = self.getDistanceTo(target);
 
 			if (distance < nearestTargetDistance) {
@@ -511,100 +459,10 @@ public final class MyStrategy implements Strategy {
 				nearestTargetDistance = distance;
 			}
 		}
-
-		return nearestTarget;
-	}
-	
-	private double getPriority(LivingUnit u){
-		List<LivingUnit> targetsBuildings = new ArrayList<>();
-		List<LivingUnit> targetsWizards = new ArrayList<>();
-		List<LivingUnit> targetsMinions = new ArrayList<>();
-		
-		targetsBuildings.addAll(Arrays.asList(world.getBuildings()));
-		if (targetsBuildings.indexOf(u)!=-1)
-			return 0.25;
-		targetsWizards.addAll(Arrays.asList(world.getWizards()));
-		if (targetsWizards.indexOf(u)!=-1)
-			return 0.8;
-		targetsMinions.addAll(Arrays.asList(world.getMinions()));
-		if (targetsMinions.indexOf(u)!=-1)
-			return 1;
-		return 1;
-	}
-	
-	private LivingUnit getNearestTargetWithLowestHP() {
-		
-		List<LivingUnit> targets = new ArrayList<>();
-		targets.addAll(Arrays.asList(world.getBuildings()));
-		targets.addAll(Arrays.asList(world.getWizards()));
-		targets.addAll(Arrays.asList(world.getMinions()));
-		
-		
-		LivingUnit nearestTarget = null;
-		double nearestTargetHP = 100;
-		double nearestTargetDistance = self.getCastRange();
-
-		for (LivingUnit target : targets) {
-			if (target.getFaction() == Faction.NEUTRAL || target.getFaction() == self.getFaction()) {
-				continue;
-			}
-			
-			double distance = self.getDistanceTo(target);
-			double HP = target.getLife();//*100/target.getMaxLife();
-		
-			if (distance <= nearestTargetDistance && (HP*getPriority(target))<=nearestTargetHP ) {
-				nearestTarget = target;
-				nearestTargetHP = HP;
-				//nearestTargetDistance = distance;
-			}
+		if(	  (nearestTargetDistance<=600 && Arrays.asList(world.getBuildings()).indexOf(nearestTarget)!=-1)
+			||(nearestTargetDistance<=500 && Arrays.asList(world.getBuildings()).indexOf(nearestTarget)==-1)){
+			return nearestTarget;
 		}
-
-		return nearestTarget;
+		return null;
 	}
-
-
-	
-/*	if (angle < Math.PI) {
-				if (Tan > 0){
-					if (Tan > game.getWizardStrafeSpeed()/game.getWizardForwardSpeed()){
-						move.setStrafeSpeed(maxSpeed);
-						move.setSpeed(Tan/game.getWizardStrafeSpeed());
-					}
-					else{
-						move.setSpeed(maxSpeed);
-						move.setStrafeSpeed(Tan*game.getWizardForwardSpeed());
-					}
-				}
-				else{
-					if (Tan > -1){
-						move.setStrafeSpeed(Math.abs(Tan*game.getWizardBackwardSpeed()));
-						move.setSpeed(-maxSpeed);
-					}
-					else{
-						move.setSpeed(Math.abs(Tan/game.getWizardBackwardSpeed()));
-						move.setStrafeSpeed(maxSpeed);
-					}
-				}
-			}
-			else{
-				if (Tan > 0){
-					if (Tan > 1){
-						move.setStrafeSpeed(-1*game.getWizardStrafeSpeed());
-						move.setSpeed(-1*Tan/game.getWizardStrafeSpeed());
-					}
-					else{
-						move.setSpeed(-maxSpeed);
-						move.setStrafeSpeed(Math.abs(Tan*game.getWizardBackwardSpeed())*(-1));
-					}
-				}
-				else{
-					if (Tan < game.getWizardStrafeSpeed()/game.getWizardForwardSpeed()){
-						move.setStrafeSpeed(-maxSpeed);
-						move.setSpeed(-1*Tan/game.getWizardStrafeSpeed());
-					}
-					else{
-						move.setSpeed(maxSpeed);
-						move.setStrafeSpeed(Tan*game.getWizardForwardSpeed());
-					}
-				}
-			}*/
+}
