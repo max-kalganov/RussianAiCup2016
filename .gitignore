@@ -94,3 +94,4 @@ local.properties
 *.resources
 *.snap
 *.snap
+*.txt

@@ -48,6 +48,7 @@ public final class MyStrategy implements Strategy {
 		if(skipMoving==0||skipMoving==3)LineChoice();				//Выбор линии
 		if(skipMoving==0||skipMoving==4)BonusSelection();			//Подбор бонусов															-- have
 		if(skipMoving==0||skipMoving==5)PositionChoice();			//Выбор позиции для атаки(выбор положения относительно окружающих юнитов)
+		if(skipMoving==0||skipMoving==6)MovementOnTheLane();				//Движение на линии
 		goTo(getNextWaypoint(),false);
 	}
 	
@@ -160,7 +161,15 @@ public final class MyStrategy implements Strategy {
 		}
 	}
 	private void MovementDuringTheAttack(){}
-	private void PositionChoice(){}			
+	private void PositionChoice(){}		
+	private void MovementOnTheLane(){
+		if(curPos.getDistanceTo(notMyBase)<=900){
+			nextWaypoint = getPreviousWaypoint();
+		}
+		else {
+			nextWaypoint = null;
+		}
+	}
 	
 	// Block Attack
 	private void TargetChoice(){} 			
@@ -391,7 +400,24 @@ public final class MyStrategy implements Strategy {
 
 		return lastWaypoint;
 	}
+	private Point2D getPreviousWaypoint() {
+		Point2D firstWaypoint = waypoints[0];
 
+		for (int waypointIndex = waypoints.length - 1; waypointIndex > 0; --waypointIndex) {
+			Point2D waypoint = waypoints[waypointIndex];
+
+			if (waypoint.getDistanceTo(self) <= WAYPOINT_RADIUS) {
+				return waypoints[waypointIndex - 1];
+			}
+
+			if (firstWaypoint.getDistanceTo(waypoint) < firstWaypoint.getDistanceTo(self)) {
+				return waypoint;
+			}
+		}
+
+		return firstWaypoint;
+	}
+	
 	private void goTo(Point2D point, boolean saveAngle) {
 		final int maxSpeed = 54;
 		double angle = self.getAngleTo(point.getX(), point.getY());
