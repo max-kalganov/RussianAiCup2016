@@ -163,7 +163,7 @@ public final class MyStrategy implements Strategy {
 	private void MovementDuringTheAttack(){}
 	private void PositionChoice(){}		
 	private void MovementOnTheLane(){
-		if(curPos.getDistanceTo(notMyBase)<=900){
+		if(curPos.getDistanceTo(notMyBase)<=900 && getNotMyBaseHP()>300){
 			nextWaypoint = getPreviousWaypoint();
 		}
 		else {
@@ -232,9 +232,20 @@ public final class MyStrategy implements Strategy {
 		nextWaypoint = p;
 	}
 	
+	private double getNotMyBaseHP(){
+		List<Building> targets = new ArrayList<>();
+		targets.addAll(Arrays.asList(world.getBuildings()));
+		for (Building target : targets) {
+			if(target.getX() == notMyBase.x && target.getY() == notMyBase.y)
+				return target.getLife();
+		}
+		return Double.MAX_VALUE;
+			
+	}
+	
 	// Здесь начинаются временные функции и переменные, которые в последствии будут заменены на более доработанные 
 	
-	private LaneType FindTheMostDistantMinion(int num){
+		private LaneType FindTheMostDistantMinion(int num){
 		List<LivingUnit> targets2 = new ArrayList<>();
 		targets2.addAll(Arrays.asList(world.getMinions()));
 		
