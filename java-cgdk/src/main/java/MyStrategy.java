@@ -19,6 +19,7 @@ public final class MyStrategy implements Strategy {
 	private static Point2D notMyBase = null; 
 	private static int skipMoving = 0;
 	private static int skipAttack = 0;
+	private static boolean targetIsNear = false;
 	
 	private Wizard self;
 	private World world;
@@ -46,16 +47,16 @@ public final class MyStrategy implements Strategy {
 		if(skipMoving==0||skipMoving==1)MovementDuringTheAttack();	//Движение во время атаки(выбор дистанции до противника/цели + отступление)	
 		if(skipMoving==0||skipMoving==2)WithdrawalFromTheLine();	//Уход с линии
 		if(skipMoving==0||skipMoving==3)LineChoice();				//Выбор линии
-		if(skipMoving==0||skipMoving==4)BonusSelection();			//Подбор бонусов															-- have
+		if(skipMoving==0||skipMoving==4)BonusSelection();			//Подбор бонусов															
 		if(skipMoving==0||skipMoving==5)PositionChoice();			//Выбор позиции для атаки(выбор положения относительно окружающих юнитов)
-		if(skipMoving==0||skipMoving==6)MovementOnTheLane();				//Движение на линии
-		goTo(getNextWaypoint(),false);
+		if(skipMoving==0||skipMoving==6)MovementOnTheLane();		//Движение на линии
+		goTo(getNextWaypoint(),targetIsNear);
 	}
 	
 	private void Attack(){
 		if(skipAttack==0||skipAttack==1)TargetChoice();			//Выбор цели						--have
 		if(skipAttack==0||skipAttack==1)AttacksStopCriterion();	//Критерий остановки атаки цели	
-		if(skipAttack==0||skipAttack==1)DerogationCriteria();		//Критерий отступления				--have
+		if(skipAttack==0||skipAttack==1)DerogationCriteria();	//Критерий отступления				--have
 	}
 	
 
@@ -160,7 +161,23 @@ public final class MyStrategy implements Strategy {
 			isNearMyBase = true;
 		}
 	}
-	private void MovementDuringTheAttack(){}
+	private void MovementDuringTheAttack(){
+		LivingUnit nearestTarget = getNearestTarget();
+		double distance;
+		if(nearestTarget == null){
+			skipMoving = 0;
+			targetIsNear = false;
+			nextWaypoint = null;
+			return;
+		}
+		targetIsNear = true;
+		skipMoving = 1;
+		distance = self.getDistanceTo(nearestTarget);
+		if (distance <= 200) {
+			nextWaypoint = getPreviousWaypoint();
+		}else
+			nextWaypoint = null;
+	}
 	private void PositionChoice(){}		
 	private void MovementOnTheLane(){
 		if(curPos.getDistanceTo(notMyBase)<=900 && getNotMyBaseHP()>300){
