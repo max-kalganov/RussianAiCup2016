@@ -1,5 +1,6 @@
 import model.*;
 
+import java.sql.Savepoint;
 import java.util.*;
 
 import com.sun.org.apache.bcel.internal.generic.SWAP;
@@ -44,16 +45,17 @@ public final class MyStrategy implements Strategy {
 		if(IfNearTarget()){		// должно быть первым,чтобы отключить любую ходьбу и начать двигаться в зависимости от атаки
 			skipMoving = 0; 
 			goBack = false;
-			
+			nextWaypoint = null;
+			targetIsNear = true;
 		}
 		if(skipMoving==0||skipMoving==1)MovementDuringTheAttack();	//Движение во время атаки(выбор дистанции до противника/цели + отступление)	
 		if(skipMoving==0||skipMoving==2)WithdrawalFromTheLine();	//Уход с линии
 		if(skipMoving==0||skipMoving==3)LineChoice();				//Выбор линии
 		if(skipMoving==0||skipMoving==5)PositionChoice();			//Выбор позиции для атаки(выбор положения относительно окружающих юнитов)
-		if(skipMoving==0||skipMoving==6)MovementOnTheLane();		//Движение на линии
+		if(skipMoving==0||skipMoving==6||skipMoving==-1)MovementOnTheLane();		//Движение на линии
 		
 		/*if(skipMoving==0||skipMoving==4||skipMoving==1)*/BonusSelection();			//Подбор бонусов															
-		goTo(getNextWaypoint(),targetIsNear);
+		if(skipMoving!=-1)goTo(getNextWaypoint(),targetIsNear);
 	}
 	
 	private void Attack(){
@@ -159,7 +161,13 @@ public final class MyStrategy implements Strategy {
 			posWhenMetTarget = curPos;
 		else if(nearestTarget == null)
 			posWhenMetTarget =  null;
-		return nearestTarget == null?false:true;
+		if(nearestTarget == null){
+			targetIsNear = false;
+		}
+		else{
+			targetIsNear = true;
+		}
+		return targetIsNear;
 	}
 	private void BonusSelection(){
 		if(goBack==true&&took==true){
@@ -231,8 +239,19 @@ public final class MyStrategy implements Strategy {
 	}
 	private void PositionChoice(){}		
 	private void MovementOnTheLane(){
+		if(game.getFactionMinionAppearanceIntervalTicks()-50>world.getTickIndex()){
+			nextWaypoint = new Point2D(100,3500);
+			
+			skipMoving = -1;
+			return ;
+		}else{
+			nextWaypoint = null;
+			skipMoving = 0;
+		}
+		
 		if(curPos.getDistanceTo(notMyBase)<=900 && getNotMyBaseHP()>300){
-			nextWaypoint = getPreviousWaypoint();
+			//nextWaypoint = getPreviousWaypoint();
+			skipMoving = -1;
 		}
 		else {
 			nextWaypoint = null;
@@ -362,7 +381,7 @@ public final class MyStrategy implements Strategy {
 				continue;
 			}
 			
-			if (distance < nearestTargetDistance2) {
+			if (distance < nearestTargetDistance2 && resLane1 != LaneChoice(target)) {
 				resLane2 = LaneChoice(target);
 				nearestTarget2 = target;
 				nearestTargetDistance2 = distance;
