@@ -1,5 +1,4 @@
 INDEX VERSION 1.129+F:\GitHub\RussianAiCup2016\.metadata\.plugins\org.eclipse.jdt.core
-1595270351.index
 4075476442.index
 1289911969.index
 882150708.index

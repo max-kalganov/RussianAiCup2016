@@ -22,6 +22,7 @@ public final class MyStrategy implements Strategy {
 	private static int skipAttack = 0;
 	private static boolean targetIsNear = false;
 	private static LivingUnit target = null;
+	private static int prevLvl = 0;
 	
 	private Wizard self;
 	private World world;
@@ -35,11 +36,21 @@ public final class MyStrategy implements Strategy {
 		InitTick(self,world,game,move);
 		if(setVariables)
 			SetVariables();
+		Skills();
+		
 		Moving();
 		
 		Attack();
 		
 	}
+	
+	private void Skills(){
+		if (self.getLevel()>prevLvl){
+			prevLvl++;
+			move.setSkillToLearn(SkillType.ADVANCED_MAGIC_MISSILE);
+		}
+	}
+	
 	
 	private void Moving(){	
 		if(IfNearTarget()){		// должно быть первым,чтобы отключить любую ходьбу и начать двигаться в зависимости от атаки
@@ -47,6 +58,7 @@ public final class MyStrategy implements Strategy {
 			goBack = false;
 			nextWaypoint = null;
 			targetIsNear = true;
+			
 		}
 		if(skipMoving==0||skipMoving==1)MovementDuringTheAttack();	//Движение во время атаки(выбор дистанции до противника/цели + отступление)	
 		if(skipMoving==0||skipMoving==2)WithdrawalFromTheLine();	//Уход с линии
@@ -170,6 +182,14 @@ public final class MyStrategy implements Strategy {
 		return targetIsNear;
 	}
 	private void BonusSelection(){
+		if (self.getDistanceTo(myBase)<=self.getRadius()*10){
+			took = true;
+			goBack = false;
+			skipMoving = 0;
+			nextWaypoint = null;
+	
+		}
+		
 		if(goBack==true&&took==true){
 			if(curPos.getDistanceTo(nextWaypoint)<200){
 				goBack = false;
@@ -239,6 +259,7 @@ public final class MyStrategy implements Strategy {
 	}
 	private void PositionChoice(){}		
 	private void MovementOnTheLane(){
+		
 		if(game.getFactionMinionAppearanceIntervalTicks()-50>world.getTickIndex()){
 			nextWaypoint = new Point2D(100,3500);
 			
